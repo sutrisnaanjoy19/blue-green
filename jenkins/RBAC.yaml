@@ -71,7 +71,7 @@ roleRef:
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  # "namespace" omitted since ClusterRoles are not namespaced
+  # "namespace" omitted since ClusterRoles are not namespace
   name: jenkinsclusterrole
 rules:
 - apiGroups: [""]
