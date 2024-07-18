@@ -1,12 +1,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: myapp
+  name: myapp-service
 spec:
   selector:
     app: myapp
+    env: blue
+  type: NodePort
   ports:
   - port: 80
     protocol: TCP
     targetPort: 80
-    nodePort: 80
+    nodePort: 30001
