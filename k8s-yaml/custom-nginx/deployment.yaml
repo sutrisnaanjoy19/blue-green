@@ -1,11 +1,11 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: myapp-deployment-${TARGET_COLOR}
+  name: custom-nginx-deployment-${TARGET_COLOR}
 spec:
   selector:
     matchLabels:
-      app: myapp
+      app: custom-nginx
       env: ${TARGET_COLOR}
   strategy:
     rollingUpdate:
@@ -15,11 +15,11 @@ spec:
   template:
     metadata:
       labels:
-        app: myapp
+        app: custom-nginx
         env: ${TARGET_COLOR}
     spec:
       containers:
-      - name: myapp
+      - name: custom-nginx
         image: registry-1.docker.io/anjoysutrisna/custom-nginx:${TARGET_VERSION}
         imagePullPolicy: Always
         ports:
