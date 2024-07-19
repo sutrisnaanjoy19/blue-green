@@ -1,0 +1,156 @@
+
+        
+def image_registry='registry-1.docker.io/anjoysutrisna/'
+def app_name= params.appname
+def APP_PATH="apps/" + app_name
+def image_name=image_registry + app_name
+def tag=''
+String COLOR_ACTIVE = ''
+def YAML_PATH = 'k8s-yaml/' + app_name
+def credentials_id = "my_k8s_updated"
+def server_url = "https://192.168.49.2:8443"
+def n_space = "default"
+
+if(params.cluster == 'minikube' ){
+    credentials_id = "my_k8s_updated"
+    server_url = "https://192.168.49.2:8443"
+    n_space = "default"
+}
+
+
+
+pipeline {
+    agent any
+    stages {
+        stage('Git Checkout') {
+            steps {
+                script 
+                {
+                    sh ("mkdir ./$BUILD_NUMBER")
+                    dir("$BUILD_NUMBER"){
+                    checkout([$class: 'GitSCM',
+                        branches: [[name: 'master']],
+                        doGenerateSubmoduleConfigurations: false,
+                        extensions: [],
+                        submoduleCfg: [],
+                        userRemoteConfigs: [[url: 'https://github.com/sutrisnaanjoy19/blue-green.git']]])
+                    sh 'git pull origin master'
+                    sh 'pwd'
+                    sh """ls -lah ${APP_PATH}"""
+                    if ( params.Revert) {
+                        tag = sh(returnStdout: true, script: """git rev-parse --short @~""").trim()
+                    }
+                    else if ( params.commit_id == 'NA' ) {
+                        tag = sh(returnStdout: true, script: """git log -1 --format=%h""").trim()
+                    }
+                    else {
+                        tag = params.commit_id
+                    }
+                    
+                    echo tag
+                    }
+                }
+            }
+        }
+
+        stage('Build Image') {
+            steps {
+                script 
+                {
+                    dir("$BUILD_NUMBER"){
+                        sh """docker build -t ${image_name}:${tag} ${APP_PATH}"""
+                        sh """docker tag ${image_name}:${tag} ${image_name}:latest"""
+                    }
+                        
+                }
+            }
+        }
+        stage('Push Image in image_registry') {
+            steps {
+                script{
+                    dir("$BUILD_NUMBER"){
+                        docker.withRegistry('https://registry-1.docker.io', 'hub_docker_com'){
+                            sh """docker push ${image_name}:${tag}"""
+                            sh """docker push ${image_name}:latest"""
+                        }
+                    }
+                }
+            }
+        }
+        stage('Check current active color') {
+            steps {
+                script{
+                    dir("$BUILD_NUMBER"){
+                        kubeconfig(credentialsId: "${credentials_id}", serverUrl: "${server_url}" ) {
+                            String test = sh(script: """kubectl get pods --selector app=myapp,env=green -n ${n_space} |  head -n1 | cut -d " " -f1 """, returnStdout: true).trim()
+                            echo test
+                            if( test == 'NAME' ){
+                                COLOR_ACTIVE = 'green'
+                                COLOR_DIACTIVATED = 'blue'
+                            }
+                            else {
+                                COLOR_ACTIVE = 'blue'
+                                COLOR_DIACTIVATED = 'green'
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        stage('apply new image version in diactivated deployment') {
+            steps {
+                script{
+                    dir("$BUILD_NUMBER"){
+                        kubeconfig(credentialsId: "${credentials_id}", serverUrl: "${server_url}" ) {
+                            sh """cat ${YAML_PATH}/deployment.yaml | TARGET_COLOR=${COLOR_DIACTIVATED} TARGET_VERSION=${tag} envsubst | kubectl apply -f -"""
+                            sh """kubectl rollout status deployment/${app_name}-deployment-${COLOR_DIACTIVATED} --timeout=120s"""
+                        }
+                    }
+                }
+            }
+        }
+        stage('shift the traffic to the new deployment') {
+            steps {
+                script{
+                    dir("$BUILD_NUMBER"){
+                        kubeconfig(credentialsId: "${credentials_id}", serverUrl: "${server_url}" ) {
+                            sh """cat ${YAML_PATH}/hpa.yaml | TARGET_COLOR=${COLOR_DIACTIVATED} envsubst | kubectl apply -f -"""
+                            sh """kubectl patch svc ${app_name}-service -p '{\"spec\":{\"selector\":{\"env\":\"${COLOR_DIACTIVATED}\"}}}' -n default """
+                            
+                        }
+                    }
+                }
+            }
+        }
+    }
+    post {
+        success {
+            script{
+                    kubeconfig(credentialsId: "${credentials_id}", serverUrl: "${server_url}" ) {
+                        sh """kubectl scale  deployment/${app_name}-deployment-${COLOR_ACTIVE} --replicas=0"""
+                        
+                    }
+                    //sh """
+                    //    curl -s -X POST --max-time 10 <YOUR_HOOK> -H "Content-Type: application/json" -d '{ "text": "Deployment SUCCESS \nBuild: ${BUILD_URL}" }'
+                    //"""
+                    
+            }
+        }
+        failure {
+            script {
+                    kubeconfig(credentialsId: "${credentials_id}", serverUrl: "${server_url}" ) {
+                        sh """kubectl patch svc ${app_name}-service -p '{\"spec\":{\"selector\":{\"env\":\"${COLOR_ACTIVE}\"}}}' -n ${n_space} """
+                        sh """kubectl scale  deployment/${app_name}-deployment-${COLOR_DIACTIVATED} --replicas=0"""
+                        
+                    }
+                    //sh """
+                    //    curl -s -X POST --max-time 10 <YOUR_HOOK> -H "Content-Type: application/json" -d '{ "text": "Deployment FAILED rolled back to previous version \nBuild: ${BUILD_URL}" }'
+                    //"""
+                    
+            }
+        }
+        always{
+            deleteDir()
+        }
+    }
+}
