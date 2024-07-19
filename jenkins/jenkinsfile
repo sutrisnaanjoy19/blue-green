@@ -97,7 +97,7 @@ pipeline {
                 }
             }
         }
-        stage('apply new image version in diactivated deployment') {
+        stage('apply new image version in deactivated deployment') {
             steps {
                 script{
                     dir("$BUILD_NUMBER"){
