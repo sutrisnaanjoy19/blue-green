@@ -58,8 +58,10 @@ pipeline {
                 script 
                 {
                     dir("$BUILD_NUMBER"){
-                        sh """docker build -t ${image_name}:${tag} ${APP_PATH}"""
-                        sh """docker tag ${image_name}:${tag} ${image_name}:latest"""
+                        if ( !params.Revert && params.commit_id == 'NA') {
+                            sh """docker build -t ${image_name}:${tag} ${APP_PATH}"""
+                            sh """docker tag ${image_name}:${tag} ${image_name}:latest"""
+                        }
                     }
                         
                 }
@@ -70,8 +72,10 @@ pipeline {
                 script{
                     dir("$BUILD_NUMBER"){
                         docker.withRegistry('https://registry-1.docker.io', 'hub_docker_com'){
-                            sh """docker push ${image_name}:${tag}"""
-                            sh """docker push ${image_name}:latest"""
+                            if ( !params.Revert && params.commit_id == 'NA') {
+                                sh """docker push ${image_name}:${tag}"""
+                                sh """docker push ${image_name}:latest"""
+                            }
                         }
                     }
                 }
@@ -82,7 +86,7 @@ pipeline {
                 script{
                     dir("$BUILD_NUMBER"){
                         kubeconfig(credentialsId: "${credentials_id}", serverUrl: "${server_url}" ) {
-                            String test = sh(script: """kubectl get pods --selector app=myapp,env=green -n ${n_space} |  head -n1 | cut -d " " -f1 """, returnStdout: true).trim()
+                            String test = sh(script: """kubectl get pods --selector app=${app_name},env=green -n ${n_space} |  head -n1 | cut -d " " -f1 """, returnStdout: true).trim()
                             echo test
                             if( test == 'NAME' ){
                                 COLOR_ACTIVE = 'green'
