@@ -4,7 +4,6 @@ metadata:
   name: custom-nginx-service
 spec:
   selector:
-    app: custom-nginx
     env: blue
   type: NodePort
   ports:
