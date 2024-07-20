@@ -35,4 +35,3 @@ spec:
           limits:
             cpu: 200m
             memory: 1Gi
-#cat blue-green/deployment.yaml | TARGET_COLOR=green TARGET_VERSION=1.0.0 envsubst | kubectl apply -f -

@@ -131,6 +131,9 @@ pipeline {
         success {
             script{
                     kubeconfig(credentialsId: "${credentials_id}", serverUrl: "${server_url}" ) {
+                        //If we don't scale the deactivated deployment replicas to 0 and keep them running with n replicas, 
+                        //it ensures quick rollbacks but incurs additional costs for larger production applications. 
+                        //For my setup I kept it as 0 we can scale it with "n" replicas where "n" depends on the application and it's traffic  
                         sh """kubectl scale  deployment/${app_name}-deployment-${COLOR_ACTIVE} --replicas=0"""
                         
                     }
@@ -144,6 +147,9 @@ pipeline {
             script {
                     kubeconfig(credentialsId: "${credentials_id}", serverUrl: "${server_url}" ) {
                         sh """kubectl patch svc ${app_name}-service -p '{\"spec\":{\"selector\":{\"env\":\"${COLOR_ACTIVE}\"}}}' -n ${n_space} """
+                        //If we don't scale the deactivated deployment replicas to 0 and keep them running with n replicas, 
+                        //it ensures quick rollbacks but incurs additional costs for larger production applications. 
+                        //For my setup I kept it as 0 we can scale it with "n" replicas where "n" depends on the application and it's traffic 
                         sh """kubectl scale  deployment/${app_name}-deployment-${COLOR_DIACTIVATED} --replicas=0"""
                         
                     }
