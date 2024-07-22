@@ -114,7 +114,7 @@ pipeline {
             }
         }
         //Here we need a Testing/monitoring stage which will test our new deployment the testing script depends on application 
-        //kubectl rollout status will check liveness/readiness status if you define one
+        //kubectl rollout status will check liveness/readiness status if you define one in application yaml
         stage('shift the traffic to the new deployment') {
             steps {
                 script{
